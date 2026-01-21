@@ -23,7 +23,7 @@ Rizma.ai is built for modularity, allowing each component to be swapped or scale
 - **Validation:** Pydantic v2
 - **Memory:** Redis (Session) & Pinecone (Vector Search)
 
-
+![alt text](arch.png)
 
 ---
 
