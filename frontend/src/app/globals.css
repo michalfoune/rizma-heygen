@@ -1,0 +1,63 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-primary: #0a0a14;
+  --bg-secondary: #0f0f1a;
+  --bg-tertiary: #1a1a2e;
+  --text-primary: #e0e0f0;
+  --text-secondary: #aaaacc;
+  --text-muted: #666688;
+  --accent: #6464a0;
+  --accent-light: #8888cc;
+  --border: #2a2a4e;
+  --success: #4ade80;
+  --error: #f87171;
+  /* Chat and controls */
+  --chat-bubble-user: #3b82f6;
+  --chat-bubble-interviewer: var(--bg-tertiary);
+  --control-bar-bg: rgba(0, 0, 0, 0.7);
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+}
+
+html,
+body {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+a {
+  color: var(--accent-light);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
