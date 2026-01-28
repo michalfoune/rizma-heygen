@@ -94,6 +94,11 @@ export function InterviewLayout({
             isTranscriptVisible={isTranscriptVisible}
             onToggleTranscript={() => setIsTranscriptVisible(!isTranscriptVisible)}
             controlsDisabled={controlsDisabled}
+            onUserTranscript={(text) => {
+              // Send user's spoken words as a message to the backend
+              console.log('User transcript received:', text);
+              onSendMessage(text);
+            }}
           />
         </div>
 

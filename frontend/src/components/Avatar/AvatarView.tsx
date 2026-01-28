@@ -14,6 +14,7 @@ interface AvatarViewProps {
   onReady?: () => void;
   onSpeakStart?: () => void;
   onSpeakEnd?: () => void;
+  onUserTranscript?: (text: string) => void;
 }
 
 export function AvatarView({
@@ -22,10 +23,13 @@ export function AvatarView({
   onReady,
   onSpeakStart,
   onSpeakEnd,
+  onUserTranscript,
 }: AvatarViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const sessionRef = useRef<LiveAvatarSession | null>(null);
   const initializingRef = useRef(false);
+  const isReadyRef = useRef(false);
+  const pendingSpeakRef = useRef<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,9 +61,9 @@ export function AvatarView({
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const proxyApiUrl = `${apiUrl}/api/v1/liveavatar`;
 
-      // Create LiveAvatar session with proxy URL to avoid CORS
+      // Create LiveAvatar session with proxy URL and voice chat enabled
       const session = new LiveAvatarSession(heygenToken, {
-        voiceChat: false,
+        voiceChat: true,
         apiUrl: proxyApiUrl,
       });
       sessionRef.current = session;
@@ -70,7 +74,27 @@ export function AvatarView({
           session.attach(videoRef.current);
         }
         setIsLoading(false);
+        isReadyRef.current = true;
+
+        // Process any pending speak commands
+        while (pendingSpeakRef.current.length > 0) {
+          const text = pendingSpeakRef.current.shift();
+          if (text) {
+            console.log('Speaking queued message:', text);
+            session.repeat(text);
+          }
+        }
+
         onReady?.();
+      });
+
+      // Handle user speech transcription
+      session.on(AgentEventsEnum.USER_TRANSCRIPTION, (event) => {
+        const text = (event as { text: string }).text;
+        console.log('User said:', text);
+        if (text && onUserTranscript) {
+          onUserTranscript(text);
+        }
       });
 
       // Handle state changes
@@ -124,8 +148,17 @@ export function AvatarView({
 
   // Method to make the avatar speak (text-to-speech repeat)
   const speak = useCallback((text: string) => {
-    if (!sessionRef.current) return;
-    // Use repeat for direct text-to-speech
+    if (!sessionRef.current) {
+      console.log('Session not ready, queueing speak:', text);
+      pendingSpeakRef.current.push(text);
+      return;
+    }
+    if (!isReadyRef.current) {
+      console.log('Avatar not ready, queueing speak:', text);
+      pendingSpeakRef.current.push(text);
+      return;
+    }
+    console.log('Avatar speaking:', text);
     sessionRef.current.repeat(text);
   }, []);
 

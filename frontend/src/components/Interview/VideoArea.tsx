@@ -15,6 +15,7 @@ interface VideoAreaProps {
   isTranscriptVisible: boolean;
   onToggleTranscript: () => void;
   controlsDisabled?: boolean;
+  onUserTranscript?: (text: string) => void;
 }
 
 export function VideoArea({
@@ -28,6 +29,7 @@ export function VideoArea({
   isTranscriptVisible,
   onToggleTranscript,
   controlsDisabled = false,
+  onUserTranscript,
 }: VideoAreaProps) {
   return (
     <div className="video-area">
@@ -37,6 +39,7 @@ export function VideoArea({
         <AvatarView
           heygenToken={heygenToken}
           avatarId={avatarId}
+          onUserTranscript={onUserTranscript}
         />
       </div>
 
