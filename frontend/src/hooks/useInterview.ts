@@ -131,8 +131,8 @@ export function useInterview(): UseInterviewReturn {
     };
     dispatch({ type: 'SET_SESSION', payload: { sessionId: data.sessionId } });
 
-    // Connect WebSocket after session is created
-    setTimeout(() => connect(), 100);
+    // Connect WebSocket after session is created - pass sessionId directly to avoid race condition
+    setTimeout(() => connect(data.sessionId), 100);
 
     return data;
   }, [connect]);
