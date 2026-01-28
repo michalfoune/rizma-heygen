@@ -29,6 +29,7 @@ env/
 # Environment
 .env
 .env.local
+.env.example
 
 # IDE
 .idea/

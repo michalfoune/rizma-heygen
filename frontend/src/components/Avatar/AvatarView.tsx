@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import StreamingAvatar, {
-  AvatarQuality,
-  StreamingEvents,
-  TaskType,
-} from '@heygen/streaming-avatar';
+import {
+  LiveAvatarSession,
+  SessionEvent,
+  SessionState,
+  AgentEventsEnum,
+} from '@heygen/liveavatar-web-sdk';
 
 interface AvatarViewProps {
   heygenToken: string | null;
@@ -23,45 +24,93 @@ export function AvatarView({
   onSpeakEnd,
 }: AvatarViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const avatarRef = useRef<StreamingAvatar | null>(null);
+  const sessionRef = useRef<LiveAvatarSession | null>(null);
+  const initializingRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const initializeAvatar = useCallback(async () => {
     if (!heygenToken || !videoRef.current) return;
 
+    // Prevent double initialization
+    if (initializingRef.current) {
+      console.log('Already initializing, skipping...');
+      return;
+    }
+    initializingRef.current = true;
+
+    // Clean up any existing session first
+    if (sessionRef.current) {
+      try {
+        await sessionRef.current.stop();
+      } catch {
+        // Ignore cleanup errors
+      }
+      sessionRef.current = null;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
 
-      const avatar = new StreamingAvatar({ token: heygenToken });
-      avatarRef.current = avatar;
+      // Get the API URL for the proxy (to avoid CORS issues)
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const proxyApiUrl = `${apiUrl}/api/v1/liveavatar`;
 
-      avatar.on(StreamingEvents.STREAM_READY, (event) => {
-        if (videoRef.current && event.detail) {
-          videoRef.current.srcObject = event.detail;
-          videoRef.current.play();
+      // Create LiveAvatar session with proxy URL to avoid CORS
+      const session = new LiveAvatarSession(heygenToken, {
+        voiceChat: false,
+        apiUrl: proxyApiUrl,
+      });
+      sessionRef.current = session;
+
+      // Handle stream ready - attach video to element
+      session.on(SessionEvent.SESSION_STREAM_READY, () => {
+        if (videoRef.current) {
+          session.attach(videoRef.current);
         }
         setIsLoading(false);
         onReady?.();
       });
 
-      avatar.on(StreamingEvents.AVATAR_START_TALKING, () => {
+      // Handle state changes
+      session.on(SessionEvent.SESSION_STATE_CHANGED, (state: SessionState) => {
+        console.log('LiveAvatar session state:', state);
+        if (state === SessionState.CONNECTED) {
+          // Stream should be ready soon
+          setIsLoading(false);
+        }
+        // Don't set error on disconnect - it may be intentional
+      });
+
+      // Handle avatar speaking events
+      session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => {
         onSpeakStart?.();
       });
 
-      avatar.on(StreamingEvents.AVATAR_STOP_TALKING, () => {
+      session.on(AgentEventsEnum.AVATAR_SPEAK_ENDED, () => {
         onSpeakEnd?.();
       });
 
-      await avatar.createStartAvatar({
-        avatarName: avatarId,
-        quality: AvatarQuality.High,
-        voice: { voiceId: 'en-US-JennyNeural' },
+      // Handle session disconnect
+      session.on(SessionEvent.SESSION_DISCONNECTED, (reason) => {
+        console.log('LiveAvatar disconnected:', reason);
       });
+
+      // Start the session
+      console.log('Starting LiveAvatar session...');
+      await session.start();
+      console.log('LiveAvatar session started successfully');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initialize avatar');
+      console.error('LiveAvatar initialization error:', err);
+      // Log additional details if available
+      if (err && typeof err === 'object') {
+        console.error('Error details:', JSON.stringify(err, null, 2));
+      }
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize avatar';
+      setError(errorMessage);
       setIsLoading(false);
+      initializingRef.current = false;
     }
   }, [heygenToken, avatarId, onReady, onSpeakStart, onSpeakEnd]);
 
@@ -69,21 +118,21 @@ export function AvatarView({
     initializeAvatar();
 
     return () => {
-      avatarRef.current?.stopAvatar();
+      sessionRef.current?.stop();
     };
   }, [initializeAvatar]);
 
-  const speak = useCallback(async (text: string) => {
-    if (!avatarRef.current) return;
-    await avatarRef.current.speak({
-      text,
-      taskType: TaskType.REPEAT,
-    });
+  // Method to make the avatar speak (text-to-speech repeat)
+  const speak = useCallback((text: string) => {
+    if (!sessionRef.current) return;
+    // Use repeat for direct text-to-speech
+    sessionRef.current.repeat(text);
   }, []);
 
-  const interrupt = useCallback(async () => {
-    if (!avatarRef.current) return;
-    await avatarRef.current.interrupt();
+  // Method to interrupt the avatar
+  const interrupt = useCallback(() => {
+    if (!sessionRef.current) return;
+    sessionRef.current.interrupt();
   }, []);
 
   // Expose methods via ref-like pattern for parent components
@@ -105,7 +154,12 @@ export function AvatarView({
       {error && (
         <div className="avatar-error">
           <p>Error: {error}</p>
-          <button onClick={initializeAvatar}>Retry</button>
+          <p className="error-hint">LiveAvatar may be rate-limited. Wait a moment and try again.</p>
+          <button onClick={() => {
+            // Reset the initializing flag and add small delay before retry
+            initializingRef.current = false;
+            setTimeout(initializeAvatar, 1000);
+          }}>Retry</button>
         </div>
       )}
       <video
@@ -159,6 +213,11 @@ export function AvatarView({
           border-radius: 6px;
           color: white;
           cursor: pointer;
+        }
+        .error-hint {
+          font-size: 0.85rem;
+          color: rgba(255, 255, 255, 0.6);
+          margin-top: 0.5rem;
         }
       `}</style>
     </div>

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class HeyGenService:
     """
-    Service for HeyGen streaming avatar integration.
+    Service for HeyGen/LiveAvatar streaming avatar integration.
 
     Provides:
     - Session token generation
@@ -24,44 +24,75 @@ class HeyGenService:
     - Voice synthesis coordination
     """
 
-    HEYGEN_API_BASE = "https://api.heygen.com/v1"
+    # Live Avatar API (separate from HeyGen API)
+    LIVE_AVATAR_API_BASE = "https://api.liveavatar.com/v1"
 
     def __init__(self, api_key: Optional[str] = None):
         """
-        Initialize HeyGen service.
+        Initialize Live Avatar service.
 
         Args:
-            api_key: HeyGen API key (defaults to settings)
+            api_key: Live Avatar API key (defaults to settings)
         """
         settings = get_settings()
         self.api_key = api_key or settings.heygen_api_key
+
         self._client = httpx.AsyncClient(
-            base_url=self.HEYGEN_API_BASE,
+            base_url=self.LIVE_AVATAR_API_BASE,
             headers={
-                "X-Api-Key": self.api_key,
+                "X-API-KEY": self.api_key,
                 "Content-Type": "application/json",
             },
             timeout=30.0,
         )
 
-    async def create_streaming_token(self) -> str:
+    async def create_streaming_token(self, avatar_id: Optional[str] = None) -> dict:
         """
-        Create a streaming session token for the frontend.
+        Create a Live Avatar session token for the frontend.
+
+        Args:
+            avatar_id: Optional avatar ID to use (defaults to first available)
 
         Returns:
-            Session token for HeyGen SDK initialization
+            Dict with session_id and session_token for SDK initialization
         """
         if not self.api_key:
-            logger.warning("HeyGen API key not configured, returning placeholder")
-            return "placeholder_token_configure_heygen_api_key"
+            logger.warning("Live Avatar API key not configured, returning placeholder")
+            return {
+                "session_id": "placeholder_session",
+                "session_token": "placeholder_token_configure_api_key"
+            }
 
         try:
-            response = await self._client.post("/streaming.create_token")
+            # Live Avatar API requires mode and avatar_id in request body
+            # Use a PUBLIC avatar from Live Avatar library ("Ann Therapist")
+            live_avatar_id = "513fd1b7-7ef9-466d-9af2-344e51eeb833"
+
+            request_body = {
+                "mode": "FULL",
+                "avatar_id": live_avatar_id,
+                "avatar_persona": {
+                    "language": "en"
+                }
+            }
+
+            logger.info(f"Creating Live Avatar session with avatar: {live_avatar_id}")
+            response = await self._client.post("/sessions/token", json=request_body)
             response.raise_for_status()
             data = response.json()
-            return data.get("data", {}).get("token", "")
+            logger.info(f"Live Avatar session created: {data}")
+
+            # Live Avatar returns session_id and session_token at top level or in data
+            result = data.get("data", data)
+            return {
+                "session_id": result.get("session_id", ""),
+                "session_token": result.get("session_token", "")
+            }
         except httpx.HTTPError as e:
-            logger.error(f"Failed to create HeyGen streaming token: {e}")
+            logger.error(f"Failed to create Live Avatar session token: {e}")
+            # Log response body for debugging
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"Response body: {e.response.text}")
             raise RuntimeError("Failed to initialize avatar session") from e
 
     async def get_available_avatars(self) -> list:
@@ -105,20 +136,18 @@ class HeyGenService:
 
     def get_avatar_for_personality(self, personality_id: str) -> str:
         """
-        Map personality ID to avatar ID.
+        Map personality ID to Live Avatar UUID.
 
         Args:
             personality_id: The personality configuration ID
 
         Returns:
-            Corresponding avatar ID
+            Corresponding Live Avatar UUID
         """
-        avatar_mapping = {
-            "default": "default_interviewer",
-            "strict": "strict_interviewer",
-            "friendly": "friendly_interviewer",
-        }
-        return avatar_mapping.get(personality_id, "default_interviewer")
+        # Use a PUBLIC avatar from Live Avatar library
+        # "Ann Therapist" for all personalities
+        live_avatar_uuid = "513fd1b7-7ef9-466d-9af2-344e51eeb833"
+        return live_avatar_uuid
 
     async def close(self) -> None:
         """Close the HTTP client."""

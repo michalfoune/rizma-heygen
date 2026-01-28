@@ -16,6 +16,11 @@
   --border: #2a2a4e;
   --success: #4ade80;
   --error: #f87171;
+  /* Chat and controls */
+  --chat-bubble-user: #3b82f6;
+  --chat-bubble-interviewer: var(--bg-tertiary);
+  --control-bar-bg: rgba(0, 0, 0, 0.7);
+  --overlay-bg: rgba(0, 0, 0, 0.6);
 }
 
 html,

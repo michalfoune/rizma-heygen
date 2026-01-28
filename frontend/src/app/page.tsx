@@ -2,13 +2,11 @@
 
 import { useState } from 'react';
 import { useInterview } from '@/hooks';
-import { AvatarView } from '@/components/Avatar';
-import { TranscriptPane } from '@/components/Transcript';
-import { PushToTalkButton } from '@/components/Controls';
-import { InterviewPhase, StartSessionResponse } from '@/types';
+import { InterviewLayout } from '@/components/Interview';
+import { StartSessionResponse } from '@/types';
 
 export default function InterviewPage() {
-  const { state, startSession, endSession, pushToTalkStart, pushToTalkStop } = useInterview();
+  const { state, startSession, endSession, sendCandidateMessage, pushToTalkStart, pushToTalkStop } = useInterview();
   const [sessionData, setSessionData] = useState<StartSessionResponse | null>(null);
   const [candidateName, setCandidateName] = useState('');
   const [targetRole, setTargetRole] = useState('');
@@ -166,166 +164,13 @@ export default function InterviewPage() {
 
   // Active session: Show interview UI
   return (
-    <main className="interview-container">
-      <header className="header">
-        <div className="header-left">
-          <h1>Interview in Progress</h1>
-          <span className="connection-status">
-            {state.isConnected ? 'Connected' : 'Connecting...'}
-          </span>
-        </div>
-        <button className="end-button" onClick={handleEnd}>
-          End Interview
-        </button>
-      </header>
-
-      <div className="content">
-        <div className="avatar-section">
-          <AvatarView
-            heygenToken={sessionData.heygenToken}
-            avatarId={sessionData.avatarId}
-          />
-        </div>
-
-        <div className="transcript-section">
-          <TranscriptPane
-            entries={state.transcript}
-            currentPhase={state.phase}
-          />
-        </div>
-      </div>
-
-      <footer className="controls">
-        <PushToTalkButton
-          isActive={state.isPushToTalkActive}
-          onStart={pushToTalkStart}
-          onStop={pushToTalkStop}
-          disabled={state.phase === InterviewPhase.EVALUATION || state.phase === InterviewPhase.COMPLETED}
-        />
-      </footer>
-
-      {state.phase === InterviewPhase.COMPLETED && state.evaluationScore !== null && (
-        <div className="results-overlay">
-          <div className="results-card">
-            <h2>Interview Complete</h2>
-            <div className={`score ${state.passed ? 'passed' : 'failed'}`}>
-              {state.evaluationScore}
-            </div>
-            <p className="result-text">
-              {state.passed
-                ? 'Congratulations! You passed the interview.'
-                : 'Unfortunately, you did not meet the passing threshold of 80.'}
-            </p>
-            <button onClick={handleEnd}>Start New Interview</button>
-          </div>
-        </div>
-      )}
-
-      <style jsx>{`
-        .interview-container {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-        }
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1rem 2rem;
-          background: var(--bg-secondary);
-          border-bottom: 1px solid var(--border);
-        }
-        .header-left {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-        .header h1 {
-          font-size: 1.25rem;
-          font-weight: 500;
-        }
-        .connection-status {
-          font-size: 0.75rem;
-          padding: 0.25rem 0.5rem;
-          background: var(--bg-tertiary);
-          border-radius: 4px;
-          color: var(--text-muted);
-        }
-        .end-button {
-          padding: 0.5rem 1rem;
-          background: transparent;
-          border: 1px solid var(--error);
-          border-radius: 6px;
-          color: var(--error);
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-        .end-button:hover {
-          background: rgba(248, 113, 113, 0.1);
-        }
-        .content {
-          flex: 1;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-          padding: 1rem;
-          overflow: hidden;
-        }
-        .avatar-section,
-        .transcript-section {
-          height: calc(100vh - 200px);
-        }
-        .controls {
-          display: flex;
-          justify-content: center;
-          padding: 1.5rem;
-          background: var(--bg-secondary);
-          border-top: 1px solid var(--border);
-        }
-        .results-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.8);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 100;
-        }
-        .results-card {
-          background: var(--bg-secondary);
-          border: 1px solid var(--border);
-          border-radius: 16px;
-          padding: 3rem;
-          text-align: center;
-          max-width: 400px;
-        }
-        .results-card h2 {
-          margin-bottom: 1.5rem;
-        }
-        .score {
-          font-size: 4rem;
-          font-weight: 700;
-          margin-bottom: 1rem;
-        }
-        .score.passed {
-          color: var(--success);
-        }
-        .score.failed {
-          color: var(--error);
-        }
-        .result-text {
-          color: var(--text-secondary);
-          margin-bottom: 2rem;
-        }
-        .results-card button {
-          padding: 0.75rem 1.5rem;
-          background: var(--accent);
-          border: none;
-          border-radius: 8px;
-          color: white;
-          cursor: pointer;
-        }
-      `}</style>
-    </main>
+    <InterviewLayout
+      sessionData={sessionData}
+      state={state}
+      onEndSession={handleEnd}
+      onSendMessage={sendCandidateMessage}
+      onPushToTalkStart={pushToTalkStart}
+      onPushToTalkStop={pushToTalkStop}
+    />
   );
 }

@@ -78,6 +78,17 @@ export function useInterview(): UseInterviewReturn {
       case 'evaluation_result':
         dispatch({ type: 'SET_EVALUATION', payload: message.payload as EvaluationResult });
         break;
+      case 'avatar_speak':
+        // Make the avatar speak the text
+        const avatarApi = (window as unknown as Record<string, unknown>).__rizmaAvatar as { speak: (text: string) => void } | undefined;
+        if (avatarApi?.speak) {
+          const text = (message.payload as { text: string }).text;
+          console.log('Avatar speaking:', text);
+          avatarApi.speak(text);
+        } else {
+          console.warn('Avatar API not available for speaking');
+        }
+        break;
       case 'error':
         console.error('Interview error:', message.payload);
         break;
@@ -93,17 +104,31 @@ export function useInterview(): UseInterviewReturn {
   });
 
   const startSession = useCallback(async (request: StartSessionRequest): Promise<StartSessionResponse> => {
+    // Convert camelCase to snake_case for backend API
+    const backendRequest = {
+      candidate_name: request.candidateName,
+      target_role: request.targetRole,
+      company_context: request.companyContext,
+      personality_id: request.personalityId,
+    };
+
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/sessions/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
+      body: JSON.stringify(backendRequest),
     });
 
     if (!response.ok) {
       throw new Error('Failed to start session');
     }
 
-    const data: StartSessionResponse = await response.json();
+    // Convert snake_case response to camelCase
+    const rawData = await response.json();
+    const data: StartSessionResponse = {
+      sessionId: rawData.session_id,
+      heygenToken: rawData.heygen_token,
+      avatarId: rawData.avatar_id,
+    };
     dispatch({ type: 'SET_SESSION', payload: { sessionId: data.sessionId } });
 
     // Connect WebSocket after session is created

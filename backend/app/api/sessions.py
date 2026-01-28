@@ -39,14 +39,15 @@ async def start_session(
         personality_id=request.personality_id or "default",
     )
 
-    # Get HeyGen streaming token
-    try:
-        heygen_token = await heygen.create_streaming_token()
-    except RuntimeError:
-        heygen_token = "development_placeholder"
-
     # Get avatar ID for the personality
     avatar_id = heygen.get_avatar_for_personality(session.personality_id)
+
+    # Get Live Avatar session token
+    try:
+        token_data = await heygen.create_streaming_token(avatar_id=avatar_id)
+        heygen_token = token_data.get("session_token", "")
+    except RuntimeError:
+        heygen_token = "development_placeholder"
 
     return StartSessionResponse(
         session_id=str(session.session_id),
