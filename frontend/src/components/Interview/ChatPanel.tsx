@@ -82,8 +82,9 @@ export function ChatPanel({
         }
         .messages-container {
           flex: 1;
-          overflow-y: auto;
+          overflow-y: scroll;
           padding: 20px;
+          min-height: 0;
         }
         .empty-state {
           display: flex;

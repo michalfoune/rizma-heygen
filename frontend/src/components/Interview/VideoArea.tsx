@@ -15,6 +15,7 @@ interface VideoAreaProps {
   isTranscriptVisible: boolean;
   onToggleTranscript: () => void;
   controlsDisabled?: boolean;
+  pushToTalkEnabled?: boolean;
   onUserTranscript?: (text: string) => void;
 }
 
@@ -29,6 +30,7 @@ export function VideoArea({
   isTranscriptVisible,
   onToggleTranscript,
   controlsDisabled = false,
+  pushToTalkEnabled = true,
   onUserTranscript,
 }: VideoAreaProps) {
   return (
@@ -40,6 +42,8 @@ export function VideoArea({
           heygenToken={heygenToken}
           avatarId={avatarId}
           onUserTranscript={onUserTranscript}
+          isPushToTalkActive={pushToTalkEnabled ? isMicActive : false}
+          pushToTalkEnabled={pushToTalkEnabled}
         />
       </div>
 
@@ -51,6 +55,7 @@ export function VideoArea({
         isTranscriptVisible={isTranscriptVisible}
         onToggleTranscript={onToggleTranscript}
         disabled={controlsDisabled}
+        pushToTalkEnabled={pushToTalkEnabled}
       />
 
       <style jsx>{`

@@ -8,6 +8,7 @@ interface ControlBarProps {
   isTranscriptVisible: boolean;
   onToggleTranscript: () => void;
   disabled?: boolean;
+  pushToTalkEnabled?: boolean;
 }
 
 export function ControlBar({
@@ -18,6 +19,7 @@ export function ControlBar({
   isTranscriptVisible,
   onToggleTranscript,
   disabled = false,
+  pushToTalkEnabled = true,
 }: ControlBarProps) {
   return (
     <div className="control-bar">
@@ -32,16 +34,16 @@ export function ControlBar({
         </svg>
       </button>
 
-      {/* Microphone (Push-to-Talk) */}
+      {/* Microphone (Push-to-Talk or always-on) */}
       <button
-        className={`control-btn mic-btn ${isMicActive ? 'active' : ''}`}
-        onMouseDown={onMicStart}
-        onMouseUp={onMicStop}
-        onMouseLeave={isMicActive ? onMicStop : undefined}
-        onTouchStart={onMicStart}
-        onTouchEnd={onMicStop}
+        className={`control-btn mic-btn ${isMicActive ? 'active' : ''} ${pushToTalkEnabled ? 'ptt-mode' : ''}`}
+        onMouseDown={pushToTalkEnabled ? onMicStart : undefined}
+        onMouseUp={pushToTalkEnabled ? onMicStop : undefined}
+        onMouseLeave={pushToTalkEnabled && isMicActive ? onMicStop : undefined}
+        onTouchStart={pushToTalkEnabled ? onMicStart : undefined}
+        onTouchEnd={pushToTalkEnabled ? onMicStop : undefined}
         disabled={disabled}
-        aria-label="Hold to speak"
+        aria-label={pushToTalkEnabled ? 'Hold to speak' : 'Microphone active'}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -114,7 +116,16 @@ export function ControlBar({
         }
         .mic-btn.active {
           background: var(--success, #4ade80);
-          animation: pulse 1s infinite;
+        }
+        /* Push-to-talk mode: very prominent when active */
+        .mic-btn.ptt-mode.active {
+          background: #22c55e;
+          box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.6);
+          animation: ptt-pulse 0.8s infinite;
+          transform: scale(1.1);
+        }
+        .mic-btn.ptt-mode:not(.active) {
+          background: rgba(255, 255, 255, 0.15);
         }
         .end-btn {
           background: var(--error, #f87171);
@@ -122,12 +133,12 @@ export function ControlBar({
         .end-btn:hover:not(:disabled) {
           background: #ef4444;
         }
-        @keyframes pulse {
+        @keyframes ptt-pulse {
           0%, 100% {
-            transform: scale(1);
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.4), 0 0 20px rgba(34, 197, 94, 0.6);
           }
           50% {
-            transform: scale(1.05);
+            box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.2), 0 0 30px rgba(34, 197, 94, 0.8);
           }
         }
       `}</style>

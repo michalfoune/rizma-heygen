@@ -6,6 +6,7 @@ from .memory import MemoryService
 from .guardrails import GuardrailsService
 from .personality import PersonalityService
 from .heygen import HeyGenService
+from .llm import LLMService
 
 __all__ = [
     "InterviewOrchestrator",
@@ -14,4 +15,5 @@ __all__ = [
     "GuardrailsService",
     "PersonalityService",
     "HeyGenService",
+    "LLMService",
 ]

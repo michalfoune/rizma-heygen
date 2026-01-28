@@ -12,6 +12,7 @@ interface InterviewLayoutProps {
   onSendMessage: (content: string) => void;
   onPushToTalkStart: () => void;
   onPushToTalkStop: () => void;
+  pushToTalkEnabled?: boolean;
 }
 
 const DEFAULT_INTERVIEW_DURATION = 20 * 60; // 20 minutes in seconds
@@ -23,6 +24,7 @@ export function InterviewLayout({
   onSendMessage,
   onPushToTalkStart,
   onPushToTalkStop,
+  pushToTalkEnabled = true,
 }: InterviewLayoutProps) {
   const [isTranscriptVisible, setIsTranscriptVisible] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState(DEFAULT_INTERVIEW_DURATION);
@@ -94,6 +96,7 @@ export function InterviewLayout({
             isTranscriptVisible={isTranscriptVisible}
             onToggleTranscript={() => setIsTranscriptVisible(!isTranscriptVisible)}
             controlsDisabled={controlsDisabled}
+            pushToTalkEnabled={pushToTalkEnabled}
             onUserTranscript={(text) => {
               // Send user's spoken words as a message to the backend
               console.log('User transcript received:', text);
@@ -202,6 +205,8 @@ export function InterviewLayout({
         }
         .chat-section {
           height: 100%;
+          min-height: 0;
+          overflow: hidden;
         }
         .results-overlay {
           position: fixed;

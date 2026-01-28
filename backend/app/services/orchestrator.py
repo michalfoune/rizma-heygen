@@ -21,6 +21,7 @@ from .evaluator import EvaluatorService
 from .guardrails import GuardrailsService
 from .memory import MemoryService
 from .personality import PersonalityService
+from .llm import LLMService
 
 logger = logging.getLogger(__name__)
 
@@ -64,11 +65,13 @@ class InterviewOrchestrator:
         memory: MemoryService,
         guardrails: GuardrailsService,
         personality_service: PersonalityService,
+        llm_service: Optional[LLMService] = None,
     ):
         self.evaluator = evaluator
         self.memory = memory
         self.guardrails = guardrails
         self.personality_service = personality_service
+        self.llm_service = llm_service or LLMService()
         self._sessions: Dict[UUID, InterviewSession] = {}
         self._phase_handlers: Dict[InterviewPhase, Callable] = {
             InterviewPhase.GREETING: self._handle_greeting,
@@ -217,31 +220,25 @@ class InterviewOrchestrator:
         """Handle messages during the greeting phase."""
         personality = self.personality_service.get_personality(session.personality_id)
 
-        # Simple response generation (would be replaced with LLM in production)
-        response = (
-            f"Thank you for that introduction. {personality.phase_prompts.technical_intro} "
-            "Let's move on to some technical questions to better understand your skills."
-        )
+        # Get the last candidate message
+        candidate_messages = [e for e in session.transcript if e.role == "candidate"]
+        last_message = candidate_messages[-1].content if candidate_messages else ""
+
+        # Generate response using LLM
+        response = self.llm_service.generate_response(session, personality, last_message)
         return response, None
 
     def _handle_technical(self, session: InterviewSession) -> Tuple[str, None]:
         """Handle messages during the technical phase."""
-        # In production, this would use LangChain to generate contextual questions
-        # based on the conversation history and target role
-        questions = [
-            "Can you describe a challenging technical problem you've solved recently?",
-            "How do you approach debugging complex issues in production?",
-            "Tell me about your experience with system design.",
-            "How do you handle technical disagreements with team members?",
-        ]
+        personality = self.personality_service.get_personality(session.personality_id)
 
-        tech_entries = [
-            e for e in session.transcript
-            if e.phase == InterviewPhase.TECHNICAL and e.role == "candidate"
-        ]
-        question_idx = min(len(tech_entries), len(questions) - 1)
+        # Get the last candidate message
+        candidate_messages = [e for e in session.transcript if e.role == "candidate"]
+        last_message = candidate_messages[-1].content if candidate_messages else ""
 
-        return questions[question_idx], None
+        # Generate contextual response using LLM
+        response = self.llm_service.generate_response(session, personality, last_message)
+        return response, None
 
     def _handle_evaluation(self, session: InterviewSession) -> Tuple[str, EvaluationResult]:
         """Handle the evaluation phase - score the interview."""

@@ -146,6 +146,9 @@ export function useInterview(): UseInterviewReturn {
   }, [state.sessionId, send, disconnect]);
 
   const sendCandidateMessage = useCallback((content: string) => {
+    // Don't add to local state - backend will accumulate messages and send
+    // the combined transcript back. This prevents partial messages from
+    // appearing in the chat during continuous speech.
     const entry: TranscriptEntry = {
       id: crypto.randomUUID(),
       role: 'candidate',
@@ -153,7 +156,6 @@ export function useInterview(): UseInterviewReturn {
       timestamp: new Date(),
       phase: state.phase,
     };
-    dispatch({ type: 'ADD_TRANSCRIPT', payload: entry });
     send({ type: 'transcript_entry', payload: entry });
   }, [state.phase, send]);
 

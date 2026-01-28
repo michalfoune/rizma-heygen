@@ -15,6 +15,8 @@ interface AvatarViewProps {
   onSpeakStart?: () => void;
   onSpeakEnd?: () => void;
   onUserTranscript?: (text: string) => void;
+  isPushToTalkActive?: boolean; // When true in PTT mode, accumulate transcripts
+  pushToTalkEnabled?: boolean; // When false, use auto-detect mode instead
 }
 
 export function AvatarView({
@@ -24,14 +26,111 @@ export function AvatarView({
   onSpeakStart,
   onSpeakEnd,
   onUserTranscript,
+  isPushToTalkActive = false,
+  pushToTalkEnabled = true,
 }: AvatarViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const sessionRef = useRef<LiveAvatarSession | null>(null);
   const initializingRef = useRef(false);
   const isReadyRef = useRef(false);
+  const isSpeakingRef = useRef(false);
   const pendingSpeakRef = useRef<string[]>([]);
+  const currentTranscriptRef = useRef<string>('');
+  const lastSentTranscriptRef = useRef<string>('');
+  const sendTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTranscriptTimeRef = useRef<number>(0);
+  const prevPushToTalkRef = useRef<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Use refs for callbacks and settings to avoid stale closure issues
+  const onUserTranscriptRef = useRef(onUserTranscript);
+  const onReadyRef = useRef(onReady);
+  const onSpeakStartRef = useRef(onSpeakStart);
+  const onSpeakEndRef = useRef(onSpeakEnd);
+  const pushToTalkEnabledRef = useRef(pushToTalkEnabled);
+  const sendTranscriptRef = useRef<() => void>(() => {});
+
+  // Keep refs updated with latest callbacks and settings
+  useEffect(() => {
+    onUserTranscriptRef.current = onUserTranscript;
+    onReadyRef.current = onReady;
+    onSpeakStartRef.current = onSpeakStart;
+    onSpeakEndRef.current = onSpeakEnd;
+    pushToTalkEnabledRef.current = pushToTalkEnabled;
+  }, [onUserTranscript, onReady, onSpeakStart, onSpeakEnd, pushToTalkEnabled]);
+
+  // Function to send transcript - must be defined before useEffect that uses it
+  const sendTranscript = useCallback(() => {
+    const transcript = currentTranscriptRef.current.trim();
+
+    if (!transcript || transcript.length < 3) {
+      currentTranscriptRef.current = '';
+      return;
+    }
+
+    // Don't send if avatar is speaking - wait for it to finish
+    if (isSpeakingRef.current) {
+      console.log('Avatar is speaking, delaying transcript send');
+      sendTimeoutRef.current = setTimeout(sendTranscript, 1000);
+      return;
+    }
+
+    // Don't send if it's exactly the same as what we already sent
+    if (transcript === lastSentTranscriptRef.current) {
+      console.log('Duplicate transcript, skipping');
+      currentTranscriptRef.current = '';
+      return;
+    }
+
+    // Send the complete transcript
+    lastSentTranscriptRef.current = transcript;
+    currentTranscriptRef.current = '';
+
+    console.log('Sending final transcript:', transcript);
+    if (onUserTranscriptRef.current) {
+      onUserTranscriptRef.current(transcript);
+    }
+  }, []);
+
+  // Keep sendTranscriptRef updated
+  useEffect(() => {
+    sendTranscriptRef.current = sendTranscript;
+  }, [sendTranscript]);
+
+  // Handle push-to-talk release - send accumulated transcript (only in PTT mode)
+  useEffect(() => {
+    if (!pushToTalkEnabled) {
+      prevPushToTalkRef.current = isPushToTalkActive;
+      return;
+    }
+
+    // Detect transition from active (true) to inactive (false)
+    if (prevPushToTalkRef.current && !isPushToTalkActive) {
+      console.log('Push-to-talk released, sending transcript after brief delay');
+      // Clear any existing timeout
+      if (sendTimeoutRef.current) {
+        clearTimeout(sendTimeoutRef.current);
+      }
+      // Wait 1 second after release to capture final transcript, then send
+      sendTimeoutRef.current = setTimeout(() => {
+        sendTranscript();
+      }, 1000);
+    }
+
+    // When push-to-talk becomes active, reset state for new utterance
+    if (!prevPushToTalkRef.current && isPushToTalkActive) {
+      console.log('Push-to-talk activated, resetting transcript state');
+      currentTranscriptRef.current = '';
+      lastSentTranscriptRef.current = '';
+      if (sendTimeoutRef.current) {
+        clearTimeout(sendTimeoutRef.current);
+        sendTimeoutRef.current = null;
+      }
+    }
+
+    prevPushToTalkRef.current = isPushToTalkActive;
+  }, [isPushToTalkActive, pushToTalkEnabled, sendTranscript]);
 
   const initializeAvatar = useCallback(async () => {
     if (!heygenToken || !videoRef.current) return;
@@ -85,16 +184,51 @@ export function AvatarView({
           }
         }
 
-        onReady?.();
+        onReadyRef.current?.();
       });
 
       // Handle user speech transcription
+      // In PTT mode: accumulate and send when button released
+      // In auto mode: debounce and send after silence period
       session.on(AgentEventsEnum.USER_TRANSCRIPTION, (event) => {
         const text = (event as { text: string }).text;
-        console.log('User said:', text);
-        if (text && onUserTranscript) {
-          onUserTranscript(text);
+        const now = Date.now();
+
+        // Ignore transcriptions while avatar is speaking (prevents feedback loop)
+        if (isSpeakingRef.current) {
+          console.log('Ignoring transcript while avatar is speaking:', text);
+          return;
         }
+
+        if (!text || text.trim().length < 2) {
+          return;
+        }
+
+        console.log('Transcript received:', text);
+
+        // Store the latest transcript (SDK sends cumulative transcript)
+        currentTranscriptRef.current = text;
+
+        // In auto-detect mode, use debounce to detect end of speech
+        if (!pushToTalkEnabledRef.current) {
+          // Check if this is a new utterance (gap > 5 seconds since last transcript)
+          if (now - lastTranscriptTimeRef.current > 5000) {
+            console.log('New utterance detected (gap > 5s), resetting state');
+            lastSentTranscriptRef.current = '';
+          }
+          lastTranscriptTimeRef.current = now;
+
+          // Clear any existing timeout
+          if (sendTimeoutRef.current) {
+            clearTimeout(sendTimeoutRef.current);
+          }
+
+          // Set a new timeout to send after 3 seconds of silence
+          sendTimeoutRef.current = setTimeout(() => {
+            sendTranscriptRef.current();
+          }, 3000);
+        }
+        // In PTT mode, just accumulate - sending happens on button release
       });
 
       // Handle state changes
@@ -107,13 +241,21 @@ export function AvatarView({
         // Don't set error on disconnect - it may be intentional
       });
 
-      // Handle avatar speaking events
+      // Handle avatar speaking events - track state to prevent feedback loop
       session.on(AgentEventsEnum.AVATAR_SPEAK_STARTED, () => {
-        onSpeakStart?.();
+        isSpeakingRef.current = true;
+        console.log('Avatar started speaking');
+        onSpeakStartRef.current?.();
       });
 
       session.on(AgentEventsEnum.AVATAR_SPEAK_ENDED, () => {
-        onSpeakEnd?.();
+        // Add a small delay before allowing user transcripts again
+        // This prevents the tail-end of avatar speech from being captured
+        setTimeout(() => {
+          isSpeakingRef.current = false;
+          console.log('Avatar finished speaking');
+        }, 500);
+        onSpeakEndRef.current?.();
       });
 
       // Handle session disconnect
@@ -136,12 +278,15 @@ export function AvatarView({
       setIsLoading(false);
       initializingRef.current = false;
     }
-  }, [heygenToken, avatarId, onReady, onSpeakStart, onSpeakEnd]);
+  }, [heygenToken, avatarId, sendTranscript]);
 
   useEffect(() => {
     initializeAvatar();
 
     return () => {
+      if (sendTimeoutRef.current) {
+        clearTimeout(sendTimeoutRef.current);
+      }
       sessionRef.current?.stop();
     };
   }, [initializeAvatar]);
@@ -213,7 +358,7 @@ export function AvatarView({
         video {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
         }
         .avatar-loading,
         .avatar-error {
