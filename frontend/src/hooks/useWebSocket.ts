@@ -13,7 +13,7 @@ interface UseWebSocketOptions {
 interface UseWebSocketReturn {
   isConnected: boolean;
   send: (message: WebSocketMessage) => void;
-  connect: () => void;
+  connect: (overrideSessionId?: string) => void;
   disconnect: () => void;
 }
 
@@ -26,14 +26,23 @@ export function useWebSocket({
   onError,
 }: UseWebSocketOptions): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const connect = useCallback(() => {
+  const connect = useCallback((overrideSessionId?: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
-    if (!sessionId) return;
+    const sid = overrideSessionId || sessionId;
+    if (!sid) {
+      console.warn('Cannot connect WebSocket: no session ID');
+      return;
+    }
 
-    const wsUrl = `${url}/${sessionId}`;
+    // Store the active session ID for reconnection
+    activeSessionIdRef.current = sid;
+
+    const wsUrl = `${url}/${sid}`;
+    console.log('Connecting WebSocket to:', wsUrl);
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -54,9 +63,9 @@ export function useWebSocket({
     ws.onclose = () => {
       setIsConnected(false);
       onDisconnect?.();
-      // Auto-reconnect after 3 seconds
+      // Auto-reconnect after 3 seconds using stored session ID
       reconnectTimeoutRef.current = setTimeout(() => {
-        if (sessionId) connect();
+        if (activeSessionIdRef.current) connect(activeSessionIdRef.current);
       }, 3000);
     };
 
@@ -72,6 +81,7 @@ export function useWebSocket({
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
+    activeSessionIdRef.current = null;
     wsRef.current?.close();
     wsRef.current = null;
     setIsConnected(false);

@@ -131,8 +131,8 @@ export function useInterview(): UseInterviewReturn {
     };
     dispatch({ type: 'SET_SESSION', payload: { sessionId: data.sessionId } });
 
-    // Connect WebSocket after session is created
-    setTimeout(() => connect(), 100);
+    // Connect WebSocket after session is created - pass sessionId directly to avoid race condition
+    setTimeout(() => connect(data.sessionId), 100);
 
     return data;
   }, [connect]);
@@ -146,6 +146,9 @@ export function useInterview(): UseInterviewReturn {
   }, [state.sessionId, send, disconnect]);
 
   const sendCandidateMessage = useCallback((content: string) => {
+    // Don't add to local state - backend will accumulate messages and send
+    // the combined transcript back. This prevents partial messages from
+    // appearing in the chat during continuous speech.
     const entry: TranscriptEntry = {
       id: crypto.randomUUID(),
       role: 'candidate',
@@ -153,7 +156,6 @@ export function useInterview(): UseInterviewReturn {
       timestamp: new Date(),
       phase: state.phase,
     };
-    dispatch({ type: 'ADD_TRANSCRIPT', payload: entry });
     send({ type: 'transcript_entry', payload: entry });
   }, [state.phase, send]);
 

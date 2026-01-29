@@ -137,14 +137,35 @@ async def handle_client_message(
     payload = message.get("payload", {})
 
     if msg_type == "transcript_entry":
-        # Process candidate message
+        # Process candidate message immediately - frontend handles debouncing
         content = payload.get("content", "")
         if not content:
             return
 
+        logger.info(f"Processing message for {session_id}: {content[:100]}...")
+
         phase, response, evaluation = orchestrator.process_candidate_message(
             session_id, content
         )
+
+        # Send user message as transcript entry (frontend doesn't add locally anymore)
+        session = orchestrator.get_session(session_id)
+        candidate_entries = [e for e in session.transcript if e.role == "candidate"]
+        if candidate_entries:
+            last_candidate = candidate_entries[-1]
+            await manager.send_message(
+                session_id,
+                WebSocketMessage(
+                    type="transcript_entry",
+                    payload={
+                        "id": str(last_candidate.id),
+                        "role": "candidate",
+                        "content": content,
+                        "timestamp": last_candidate.timestamp.isoformat(),
+                        "phase": phase.value,
+                    },
+                ),
+            )
 
         # Send state update if phase changed
         await manager.send_message(
@@ -154,7 +175,6 @@ async def handle_client_message(
 
         # Send interviewer response
         if response:
-            session = orchestrator.get_session(session_id)
             await manager.send_message(
                 session_id,
                 WebSocketMessage(

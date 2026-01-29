@@ -12,6 +12,7 @@ export default function InterviewPage() {
   const [targetRole, setTargetRole] = useState('');
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pushToTalkEnabled, setPushToTalkEnabled] = useState(true);
 
   const handleStart = async () => {
     if (!candidateName.trim() || !targetRole.trim()) {
@@ -47,7 +48,8 @@ export default function InterviewPage() {
     return (
       <main className="setup-container">
         <div className="setup-card">
-          <h1>Rizma.ai Interview Simulation</h1>
+          <img src="/rizma-logo.png" alt="Rizma" className="logo" />
+          <h1>rizma.ai Interview Simulation</h1>
           <p className="subtitle">Practice your interview skills with an AI-powered interviewer</p>
 
           <div className="form">
@@ -72,6 +74,25 @@ export default function InterviewPage() {
                 placeholder="e.g., Senior Software Engineer"
                 disabled={isStarting}
               />
+            </div>
+            <div className="field toggle-field">
+              <label htmlFor="ptt">Push-to-Talk Mode</label>
+              <div className="toggle-row">
+                <button
+                  type="button"
+                  className={`toggle ${pushToTalkEnabled ? 'active' : ''}`}
+                  onClick={() => setPushToTalkEnabled(!pushToTalkEnabled)}
+                  disabled={isStarting}
+                  aria-pressed={pushToTalkEnabled}
+                >
+                  <span className="toggle-slider" />
+                </button>
+                <span className="toggle-hint">
+                  {pushToTalkEnabled
+                    ? 'Hold mic button while speaking'
+                    : 'Speak freely, auto-detect when done'}
+                </span>
+              </div>
             </div>
             {error && <p className="error">{error}</p>}
             <button
@@ -99,6 +120,16 @@ export default function InterviewPage() {
             padding: 3rem;
             max-width: 480px;
             width: 100%;
+            text-align: center;
+          }
+          .logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+          }
+          .form {
+            text-align: left;
           }
           h1 {
             font-size: 1.75rem;
@@ -157,6 +188,50 @@ export default function InterviewPage() {
             opacity: 0.6;
             cursor: not-allowed;
           }
+          .toggle-field {
+            margin-top: 0.5rem;
+          }
+          .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+          .toggle {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            padding: 0;
+          }
+          .toggle:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+          }
+          .toggle.active {
+            background: var(--accent);
+            border-color: var(--accent);
+          }
+          .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+          }
+          .toggle.active .toggle-slider {
+            transform: translateX(22px);
+          }
+          .toggle-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+          }
         `}</style>
       </main>
     );
@@ -171,6 +246,7 @@ export default function InterviewPage() {
       onSendMessage={sendCandidateMessage}
       onPushToTalkStart={pushToTalkStart}
       onPushToTalkStop={pushToTalkStop}
+      pushToTalkEnabled={pushToTalkEnabled}
     />
   );
 }
