@@ -36,6 +36,7 @@ export function VideoArea({
   return (
     <div className="video-area">
       <Timer timeRemaining={timeRemaining} />
+      <img src="/rizma-logo.png" alt="Rizma" className="video-logo" />
 
       <div className="avatar-container">
         <AvatarView
@@ -65,6 +66,16 @@ export function VideoArea({
           background: var(--bg-primary);
           border-radius: 12px;
           overflow: hidden;
+        }
+        .video-logo {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          width: 40px;
+          height: 40px;
+          border-radius: 8px;
+          z-index: 10;
+          opacity: 0.9;
         }
         .avatar-container {
           width: 100%;

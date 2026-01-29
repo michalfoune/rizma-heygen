@@ -40,6 +40,7 @@ export function AvatarView({
   const sendTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTranscriptTimeRef = useRef<number>(0);
   const prevPushToTalkRef = useRef<boolean>(false);
+  const pttReleasedRef = useRef<boolean>(false); // Track if PTT was released, waiting for final transcript
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,15 +108,20 @@ export function AvatarView({
 
     // Detect transition from active (true) to inactive (false)
     if (prevPushToTalkRef.current && !isPushToTalkActive) {
-      console.log('Push-to-talk released, sending transcript after brief delay');
+      console.log('Push-to-talk released, waiting for final transcripts...');
+      pttReleasedRef.current = true;
+
       // Clear any existing timeout
       if (sendTimeoutRef.current) {
         clearTimeout(sendTimeoutRef.current);
       }
-      // Wait 1 second after release to capture final transcript, then send
+      // Start initial timer - will be reset by incoming transcripts
+      // Send after 2s of no new transcripts
       sendTimeoutRef.current = setTimeout(() => {
+        console.log('No more transcripts, sending now');
+        pttReleasedRef.current = false;
         sendTranscript();
-      }, 1000);
+      }, 2000);
     }
 
     // When push-to-talk becomes active, reset state for new utterance
@@ -123,6 +129,7 @@ export function AvatarView({
       console.log('Push-to-talk activated, resetting transcript state');
       currentTranscriptRef.current = '';
       lastSentTranscriptRef.current = '';
+      pttReleasedRef.current = false;
       if (sendTimeoutRef.current) {
         clearTimeout(sendTimeoutRef.current);
         sendTimeoutRef.current = null;
@@ -206,11 +213,39 @@ export function AvatarView({
 
         console.log('Transcript received:', text);
 
-        // Store the latest transcript (SDK sends cumulative transcript)
-        currentTranscriptRef.current = text;
+        // In PTT mode, accumulate transcripts (SDK may reset periodically)
+        if (pushToTalkEnabledRef.current) {
+          const current = currentTranscriptRef.current;
+          // Check if this is a continuation or a new segment
+          // If the new text doesn't start with what we have, it's likely a new segment
+          if (current && !text.toLowerCase().startsWith(current.toLowerCase().substring(0, 20))) {
+            // New segment - append with space
+            currentTranscriptRef.current = current + ' ' + text;
+            console.log('Accumulated transcript:', currentTranscriptRef.current);
+          } else {
+            // Continuation - use the longer one
+            if (text.length > current.length) {
+              currentTranscriptRef.current = text;
+            }
+          }
 
-        // In auto-detect mode, use debounce to detect end of speech
-        if (!pushToTalkEnabledRef.current) {
+          // If PTT was released and we're waiting, reset the timer on each new transcript
+          if (pttReleasedRef.current) {
+            console.log('New transcript after PTT release, resetting send timer');
+            if (sendTimeoutRef.current) {
+              clearTimeout(sendTimeoutRef.current);
+            }
+            // Wait another 2s for more transcripts
+            sendTimeoutRef.current = setTimeout(() => {
+              console.log('Transcripts settled, sending now');
+              pttReleasedRef.current = false;
+              sendTranscriptRef.current();
+            }, 2000);
+          }
+        } else {
+          // In auto mode, just store the latest (SDK sends cumulative)
+          currentTranscriptRef.current = text;
+
           // Check if this is a new utterance (gap > 5 seconds since last transcript)
           if (now - lastTranscriptTimeRef.current > 5000) {
             console.log('New utterance detected (gap > 5s), resetting state');
@@ -228,7 +263,6 @@ export function AvatarView({
             sendTranscriptRef.current();
           }, 3000);
         }
-        // In PTT mode, just accumulate - sending happens on button release
       });
 
       // Handle state changes

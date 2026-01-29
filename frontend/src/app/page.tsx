@@ -48,7 +48,8 @@ export default function InterviewPage() {
     return (
       <main className="setup-container">
         <div className="setup-card">
-          <h1>Rizma.ai Interview Simulation</h1>
+          <img src="/rizma-logo.png" alt="Rizma" className="logo" />
+          <h1>rizma.ai Interview Simulation</h1>
           <p className="subtitle">Practice your interview skills with an AI-powered interviewer</p>
 
           <div className="form">
@@ -119,6 +120,16 @@ export default function InterviewPage() {
             padding: 3rem;
             max-width: 480px;
             width: 100%;
+            text-align: center;
+          }
+          .logo {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+          }
+          .form {
+            text-align: left;
           }
           h1 {
             font-size: 1.75rem;
